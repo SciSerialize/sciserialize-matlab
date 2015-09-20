@@ -196,7 +196,7 @@ function [obj, idx] = map(json, idx, str_tokens, num_tokens)
             end
             idx = next(json, idx);
             [val, idx] = value(json, idx, str_tokens, num_tokens);
-            obj(key) = val; % make sure it's a valid name
+            obj(key) = val; 
             idx = next(json, idx);
             if json(idx) == ','
                 idx = idx+1;
@@ -321,33 +321,30 @@ if isempty(regexp(t, '\d\d:\d\d:\d\d\.\d', 'match'))
 end
 out = regexp(t(end-5:end), '([-+]\d\d(:\d\d)?)|Z', 'match');
 if isempty(out)
-    zone = '+00:00';
-    t = [t zone];
+    obj = datetime(t, ...
+    'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss.SSSS', ...
+    'Format', 'yyyy-MM-dd''T''HH:mm:ss.SSSS');
 else
     zone = out{1};
-end
-obj = datetime(t, ...
+    obj = datetime(t, ...
     'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss.SSSSXXX', ...
     'TimeZone', zone, ...
     'Format', 'yyyy-MM-dd''T''HH:mm:ss.SSSSXXX');
 end
 
+end
+
 function obj = timedelta_decoder(map)
-%         keys = {'days', 'seconds', 'microsec'};
-%         values = zeros(1,3);
-%         for idx=1:3
-%             values(idx) = map(keys{idx});
-%         end
-%         disp(values)
-%         obj = duration(values(1)*24, 0, values(2), values(3)/(10^3), ...
-%             'Format','dd:hh:mm:ss.SSSSSS');
-keys = {'days', 'seconds', 'microsec'};
-values = zeros(1,3);
-for idx=1:3
-    values(idx) = map(keys{idx});
+    keys = {'days', 'seconds', 'microsec'};
+    values = zeros(1,3);
+    for idx=1:3
+        values(idx) = map(keys{idx});
+    end
+    %disp(values)
+    obj = duration(values(1)*24, 0, values(2), values(3)/(10^3), ...
+        'Format','dd:hh:mm:ss.SSSSSS'); % rundungsfehler
 end
-obj = struct(keys{1},values(1),keys{2},values(2),keys{3},values(3));
-end
+
 
 function obj = nd_array_decoder(map)
 bytes = map('bytes');
@@ -379,6 +376,6 @@ bytes = map('bytes');
         if length(dim) > 2
             obj = permute(data,[2 1 3:length(dim)]); 
         else
-            obj = permute(reshape(data,dim),[2 1]);
+            obj = permute(data,[2 1]);
         end
 end
