@@ -48,6 +48,10 @@ function [json] = value(data)
                 json = cell(data);
             elseif isa(data , 'containers.Map')
                 json = map(data);
+            elseif isa(data , 'duration')
+                json = encode_duration(data);
+            elseif isa(data , 'datetime')
+                json = encode_datetime(data);
             elseif any(size(data) > 1)
                 json = array(data);
             elseif isstruct(data)
@@ -228,7 +232,7 @@ function [json] = encode_nd_array(data)
     else
         return % don't encode
     end
-    % save as row-major (C, Python)
+    
     nd_size = num2cell(fliplr(size(data)));
     base64 = containers.Map('__base64__',base64);
     keys = {'shape', 'dtype', 'bytes', '__type__'};
@@ -237,3 +241,24 @@ function [json] = encode_nd_array(data)
     json = value(map);
 end
 
+function [json] = encode_datetime(data)
+     %data.Format = 'yyyy-MM-dd''T''HH:mm:ss.SSSS';
+     date_string =  char(data,'yyyy-MM-dd''T''HH:mm:ss.SSSS');
+     time_zone = data.TimeZone;
+     keys = {'isostr', '__type__'};
+     values = {[date_string time_zone], 'datetime'};
+     map = containers.Map(keys, values);
+     json = value(map);
+end
+
+function [json] = encode_duration(data)
+    %delta_str = char(data, 'hh:mm:ss.SSSSSS');
+    date_vec = datevec(data);
+    days = date_vec(2) * 365 + date_vec(3);
+    seconds = date_vec(4) * 3600 + date_vec(5) * 60 + fix(date_vec(6));
+    micro_seconds = round(mod(date_vec(6), 1) * 10^6);
+    keys = {'days', 'seconds', 'microsec', '__type__'};
+    values = {days, seconds, micro_seconds, 'timedelta'};
+    map = containers.Map(keys, values);
+    json = value(map);
+end
