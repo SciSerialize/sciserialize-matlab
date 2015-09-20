@@ -341,8 +341,8 @@ function obj = timedelta_decoder(map)
         values(idx) = map(keys{idx});
     end
     %disp(values)
-    obj = duration(values(1)*24, 0, values(2), values(3)/(10^3), ...
-        'Format','dd:hh:mm:ss.SSSSSS'); % rundungsfehler
+    obj = duration(values(1)*24, fix(values(2)/60), mod(values(2),60) + values(3)/(10^6), ...
+        'Format','dd:hh:mm:ss.SSSSS'); % rundungsfehler fehlt eine stelle
 end
 
 
