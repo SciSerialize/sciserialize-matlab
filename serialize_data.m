@@ -15,23 +15,23 @@
 % This code is licensed under the BSD 3-clause license
 
 function [ json ] = serialize_data( data )
-try
-    if isnumeric(data) && any(size(data) > 1)
-        map = encode_nd_array(data);
-        json = dumpjson(map);
-    elseif isa(data , 'duration')
-        map = encode_duration(data);
-        json = dumpjson(map);
-    elseif isa(data , 'datetime')
-        map = encode_datetime(data);
-        json = dumpjson(map);
-    else
-        json = dumpjson();
+    try
+        if isnumeric(data) && any(size(data) > 1)
+            map = encode_nd_array(data);
+            json = dumpjson(map);
+        elseif isa(data , 'duration')
+            map = encode_duration(data);
+            json = dumpjson(map);
+        elseif isa(data , 'datetime')
+            map = encode_datetime(data);
+            json = dumpjson(map);
+        else
+            json = dumpjson();
+        end
+    catch err
+        error('MAP:dump:unknowntype', ...
+                  ['can''t serialize ' char(data) ' (' class(data) ')']);
     end
-catch err
-    error('MAP:dump:unknowntype', ...
-              ['can''t serialize ' char(data) ' (' class(data) ')']);
-end
 end
 
 % creates map with base64 data of an nd-array
