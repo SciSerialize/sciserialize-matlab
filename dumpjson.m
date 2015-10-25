@@ -1,6 +1,4 @@
 %DUMPJSON dumps Matlab data as a JSON string
-%It is a moddified version of the original DUMPJSON written by Bastian
-%Bechtold (c) 2014.
 % DUMPJSON(DATA)
 %    recursively walks through DATA and creates a JSON string from it.
 %    - strings are converted to strings with escape sequences
@@ -14,14 +12,18 @@
 %    - structs are converted to objects
 %    - struct arrays are converted to arrays of objects
 %    - containers.Map are converted to objects
+%    - containers.Map arrays are converted to arrays of objects
 %    - function handles and matlab objects will raise an error.
 %
 %    In contrast to may other JSON parsers, this one does not try
 %    special-case numeric matrices. Also, this correctly transplates
 %    escape sequences in strings.
 
-% (c) 2015 Nils L. Westhausen
+% (c) 2014 Bastian Bechtold
 % This code is licensed under the BSD 3-clause license
+
+% Change-log:
+% 2015 Oct: use of maps for objects possible. (by Nils L. Westhausen)
 
 function [json] = dumpjson(data)
     if numel(data) > 10000
@@ -30,13 +32,9 @@ function [json] = dumpjson(data)
     end
     json = value(data);
 end
-
-
-
 % dispatches based on data type
 function [json] = value(data)
     try
-        
         if any(size(data) == 0)
             json = null(data);
         elseif ndims(data) > 2 || all(size(data) > 1)
@@ -53,20 +51,18 @@ function [json] = value(data)
             elseif isstruct(data)
                 json = struct(data);
             elseif isscalar(data)
-                
                 if islogical(data)
                     json = logical(data);
                 elseif isnumeric(data)
                     json = number(data);
                 else
-                    
                     error();
                 end
             end
         end
     catch err
         error('JSON:dump:unknowntype', ...
-              ['can''t encode ' ' (' class(data) ') as JSON']);
+              ['can''t encode ' char(data) ' (' class(data) ') as JSON']);
     end
 end
 
@@ -153,16 +149,16 @@ function [json] = struct(data)
     json = [json '}'];
 end
 
-% dumps a map as an object
+% dumps a containers.map as an object
 function [json] = map(data)
     json = '{';
-    keies = keys(data);
-    for idx=1:length(keies)
-        key = keies{idx};
+    map_keys = keys(data);
+    for idx=1:length(map_keys)
+        key = map_keys{idx};
         json = [json value(key) ':' value(data(key))];
-        if idx < length(keies)
+        if idx < length(map_keys)
             json = [json ','];
-        end 
+        end
     end
     json = [json '}'];
 end

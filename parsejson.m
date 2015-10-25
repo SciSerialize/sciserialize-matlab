@@ -1,8 +1,5 @@
 %PARSEJSON parses a json string into Matlab data structures
-%It is a moddified version of the original PARSEJSON written by Bastian
-%Bechtold (c) 2014.
-%It now uses containers.map as default for objects.
-% PARSEJSON(STRING)
+% PARSEJSON(STRING, OBJECT_TAG)
 %    reads STRING as JSON data, and creates Matlab data structures
 %    from it.
 %    - strings are converted to strings with escape sequences removed
@@ -10,7 +7,9 @@
 %    - true, false are converted to logical 1, 0
 %    - null is converted to []
 %    - arrays are converted to cell arrays
-%    - objects are converted to containers.map
+%    - objects are converted to containers.map or structs
+%       for structs use OBJECT_TAG "_struct_"
+%       for maps use "_map_". Map is default if no tag is given.
 %
 %    In contrast to many other JSON parsers, this one does not try to
 %    convert all-numeric arrays into matrices. Thus, nested data
@@ -20,21 +19,26 @@
 %    This is a complete implementation of the JSON spec, and invalid
 %    data will generally throw errors.
 
-% (c) 2015 Nils L. Westhausen
+% (c) 2014 Bastian Bechtold
 % This code is licensed under the BSD 3-clause license
 
-function [obj] = parsejson(json)
+% Change-log:
+% 2015 Oct: use of maps for objects possible. (by Nils L. Westhausen)
+
+function [obj] = parsejson(json, object_tag)
+    if nargin < 2
+        object_tag = '_map_';
+    end
     json = unescape_strings(json);
     str_tokens = tokenize_strings(json);
     num_tokens = tokenize_numbers(json);
     idx = next(json, 1);
-    [obj, idx] = value(json, idx, str_tokens, num_tokens);
+    [obj, idx] = value(json, idx, str_tokens, num_tokens, object_tag);
     idx = next(json, idx);
     if idx ~= length(json)+1
         error('JSON:parse:multipletoplevel', ...
               ['more than one top-level item (char ' num2str(idx) ')']);
     end
-    clear global tag_struct
 end
 
 % advances idx to the first non-whitespace
@@ -45,16 +49,16 @@ function [idx] = next(json, idx)
 end
 
 % dispatches based on JSON type
-function [obj, idx] = value(json, idx, str_tokens, num_tokens)
+function [obj, idx] = value(json, idx, str_tokens, num_tokens, object_tag
     char = json(idx);
     if char == '"'
         [obj, idx] = string(json, idx, str_tokens);
     elseif any(char == '0123456789-')
         [obj, idx] = number(json, idx, num_tokens);
     elseif char == '{'
-        [obj, idx] = map(json, idx, str_tokens, num_tokens);
+        [obj, idx] = object(json, idx, str_tokens, num_tokens, object_tag);
     elseif char == '['
-        [obj, idx] = array(json, idx, str_tokens, num_tokens);
+        [obj, idx] = array(json, idx, str_tokens, num_tokens, object_tag);
     elseif char == 't'
         [obj, idx] = true(json, idx);
     elseif char == 'f'
@@ -123,9 +127,16 @@ function [obj, idx] = number(json, idx, num_tokens)
 end
 
 % parses an object and advances idx
-function [obj, idx] = object(json, idx, str_tokens, num_tokens)
+function [obj, idx] = object(json, idx, str_tokens, num_tokens, object_tag)
     start = idx;
-    obj = struct();
+    if strcmp(object_tag, '_map_')
+        obj = containers.Map();
+    elseif strcmp(object_tag, '_struct_')
+         obj = struct();
+    else
+        error('JSON:parse:object:wrong_tag',...
+            ['"' object_tag '" is no valid object_tag']);
+    end
     if json(idx) ~= '{'
         error('JSON:parse:object:nobrace', ...
               ['object must start with "{" (char ' num2str(idx) ')']);
@@ -148,53 +159,12 @@ function [obj, idx] = object(json, idx, str_tokens, num_tokens)
                        '" (char ' num2str(idx) ')']);
             end
             idx = next(json, idx);
-            [val, idx] = value(json, idx, str_tokens, num_tokens);
-            obj.(genvarname(key)) = val; % make sure it's a valid name
-            idx = next(json, idx);
-            if json(idx) == ','
-                idx = idx+1;
-                idx = next(json, idx);
-                continue
-            elseif json(idx) == '}'
-                break
+            [val, idx] = value(json, idx, str_tokens, num_tokens, object_tag);
+            if strcmp(object_tag, '_struct_')
+                obj(key) = val;
             else
-                error('JSON:parse:object:unknownseparator', ...
-                      ['no "," or "}" after entry in "' json(start:idx-1) ...
-                       '" (char ' num2str(idx) ')']);
+                obj.(genvarname(key)) = val; % make sure it's a valid name
             end
-        end
-    end
-    idx = idx+1;
-end
-
-% parses an object to matlab map class and advances idx
-function [obj, idx] = map(json, idx, str_tokens, num_tokens)
-    start = idx;
-    obj = containers.Map();
-    if json(idx) ~= '{'
-        error('JSON:parse:object:nobrace', ...
-              ['object must start with "{" (char ' num2str(idx) ')']);
-    end
-    idx = idx+1;
-    idx = next(json, idx);
-    if json(idx) ~= '}'
-        while 1
-            if json(idx) ~= '"'
-                error('JSON:parse:string:noquote', ...
-                      ['string must start with " (char ' num2str(idx) ')']);
-            end
-            [key, idx] = string(json, idx, str_tokens);
-            idx = next(json, idx);
-            if json(idx) == ':'
-                idx = idx+1;
-            else
-                error('JSON:parse:object:nocolon', ...
-                      ['no ":" after object key in "' json(start:idx-1) ...
-                       '" (char ' num2str(idx) ')']);
-            end
-            idx = next(json, idx);
-            [val, idx] = value(json, idx, str_tokens, num_tokens);
-            obj(key) = val; 
             idx = next(json, idx);
             if json(idx) == ','
                 idx = idx+1;
@@ -213,7 +183,7 @@ function [obj, idx] = map(json, idx, str_tokens, num_tokens)
 end
 
 % parses an array and advances idx
-function [obj, idx] = array(json, idx, str_tokens, num_tokens)
+function [obj, idx] = array(json, idx, str_tokens, num_tokens, object_tag)
     start = idx;
     obj = {};
     if json(idx) ~= '['
@@ -224,7 +194,7 @@ function [obj, idx] = array(json, idx, str_tokens, num_tokens)
     idx = next(json, idx);
     if json(idx) ~= ']'
         while 1
-            [val, idx] = value(json, idx, str_tokens, num_tokens);
+            [val, idx] = value(json, idx, str_tokens, num_tokens, object_tag);
             obj = [obj, {val}];
             idx = next(json, idx);
             if json(idx) == ','
