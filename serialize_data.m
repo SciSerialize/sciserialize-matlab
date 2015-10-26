@@ -1,36 +1,54 @@
-%serialize_data parses Matlab data structures  into a json string 
-% It is based on the project transplant written by Bastian Bechtold (c) 2014.
-% It uses a moddified version of the DUMPJSON function from the transplant
-% project.
-%   serialize_data(DATA)
-%    creates json strings from Matlab data structures It implements the 
-%    SciSerialize format deffinied on 
+%SERIALIZE_DATA parses Matlab data structures  into a json string
+% SERIALIZE_DATA(DATA)
+%    creates json strings from Matlab data structures. It implements the
+%    SciSerialize format defined on
 %    https://github.com/SciSerialize/Definition. The supported data types
-%    are datetime, timedelta(in matlab duration) and N dimensional arrays
-%    (converted to matlab matrix). For details see the deffinition webpage.
-%
-
+%    are datetime, timedelta (in matlab duration) and N dimensional arrays
+%    (converted to matlab matrix). For details see the definition webpage.
 
 % (c) 2015 Nils L. Westhausen
 % This code is licensed under the BSD 3-clause license
 
+% serializing data-structures to json
 function [ json ] = serialize_data( data )
     try
-        if isnumeric(data) && any(size(data) > 1)
-            map = encode_nd_array(data);
-            json = dumpjson(map);
-        elseif isa(data , 'duration')
-            map = encode_duration(data);
-            json = dumpjson(map);
-        elseif isa(data , 'datetime')
-            map = encode_datetime(data);
-            json = dumpjson(map);
-        else
-            json = dumpjson();
-        end
+        data = value(data);
     catch err
-        error('MAP:dump:unknowntype', ...
-                  ['can''t serialize ' char(data) ' (' class(data) ')']);
+        err
+        error('error by serializing the data to containers.Map');
+    end
+    json = dumpjson(data);
+end
+
+% checking value of data in a recursive way
+function obj = value(data)
+    if isnumeric(data) && any(size(data) > 1)
+        obj = encode_nd_array(data);
+    elseif isa(data , 'duration')
+        obj = encode_duration(data);
+    elseif isa(data , 'datetime')
+        obj = encode_datetime(data);
+    elseif isstruct(data)
+        struct_keys = fieldnames(data);
+        obj = struct();
+        for idx = 1:length(struct_keys)
+            key = struct_keys{idx};
+            obj.(key) = value(data.(key));
+        end
+    elseif iscell(data)
+        obj = {};
+        for idx = 1:length(data)
+            obj{idx} = value(data{idx});
+        end
+    elseif isa(data, 'containers.Map')
+        map_keys = keys(data);
+        obj = containers.Map();
+        for idx = 1:length(map_keys)
+            key = map_keys{idx};
+            obj(key) = value(data(key));
+        end
+    else
+        obj = data;
     end
 end
 
@@ -54,7 +72,6 @@ function [map] = encode_nd_array(data)
         if isa(data, 'single')
             tmp = single(tmp);
         end
-        
         if length(dim) > 2
             data = permute(data,[2 1 3:length(dim)]);
         else
@@ -66,7 +83,6 @@ function [map] = encode_nd_array(data)
     end
     if islogical(data)
         % convert logicals (bool) into one-byte-per-bit
-        
         if length(dim) > 2
             data = permute(data,[2 1 3:length(dim)]);
         else
@@ -74,7 +90,7 @@ function [map] = encode_nd_array(data)
         end
         binary = cast(data,'uint8');
     end
-    base64 = base64encode(binary);
+    base64_map = base64encode(binary);
     % translate Matlab class names into numpy dtypes
     if isa(data, 'double') && isreal(data)
         dtype = 'float64';
@@ -91,11 +107,10 @@ function [map] = encode_nd_array(data)
     else
         return % don't encode
     end
-    
-    nd_size = num2cell(fliplr(size(data)));
-    base64 = containers.Map('__base64__',base64);
-    keys = {'shape', 'dtype', 'bytes', '__type__'};
-    values = {nd_size, dtype, base64, 'ndarray'};
+    siz = num2cell(fliplr(size(data)));
+    base64_map = containers.Map('__base64__', base64_map);
+    keys = {'__type__', 'shape', 'dtype', 'bytes'};
+    values = {'ndarray', siz, dtype, base64_map};
     map = containers.Map(keys, values);
 end
 
@@ -103,8 +118,8 @@ end
 function [map] = encode_datetime(data)
      date_string =  char(data,'yyyy-MM-dd''T''HH:mm:ss.SSSS');
      time_zone = data.TimeZone;
-     keys = {'isostr', '__type__'};
-     values = {[date_string time_zone], 'datetime'};
+     keys = { '__type__', 'isostr'};
+     values = {'datetime', [date_string time_zone]};
      map = containers.Map(keys, values);
 end
 
@@ -112,9 +127,9 @@ end
 function [map] = encode_duration(data)
     millisec = milliseconds(data);
     seconds = millisec/1000;
-    micro_seconds = round(mod(seconds, 1) * 10^6);
+    micro_seconds = round(rem(seconds, 1) * 10^6);
     seconds = fix(seconds);
-    keys = {'days', 'seconds', 'microsec', '__type__'};
-    values = {0, seconds, micro_seconds, 'timedelta'};
+    keys = { '__type__', 'days', 'seconds', 'microsec'};
+    values = {'timedelta', 0, seconds, micro_seconds};
     map = containers.Map(keys, values);
 end

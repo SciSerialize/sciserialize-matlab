@@ -1,67 +1,74 @@
-%deserialize_data parses a json string into Matlab data structures
-% It is based on the project transplant written by Bastian Bechtold (c) 2014.
-% It uses a moddified version of the parsejson function from the transplant
-% project.
-% deserialize_data(STRING)
+%DESERIALIZE_DATA parses a json string into Matlab data structures
+% DESERIALIZE_DATA(STRING)
 %    reads STRING as JSON data, and creates Matlab data structures
-%    from it. It decodes the SciSerialize format deffinied on 
+%    from it. It decodes the SciSerialize format defined on
 %    https://github.com/SciSerialize/Definition. The supported data types
 %    are datetime, timedelta(in matlab duration) and N dimensional arrays
-%    (converted to matlab matrix). For details see the deffinition webpage.
-%
-%    
-%
-%    This is a complete implementation of the JSON spec, and invalid
-%    data will generally throw errors.
+%    (converted to matlab matrix). For details see the definition webpage.
 
 % (c) 2015 Nils L. Westhausen
 % This code is licensed under the BSD 3-clause license
 
 function [obj] = deserialize_data(data)
+    obj = parsejson(data);
     try
-        map = parsejson(data);
+        obj = type_decoder(obj);
     catch
-        error(['Parsing json-data failed']);
-    end
-
-    try
-        obj = type_decoder(map);
-
-    catch
-        error(['Type ' map('__type__') ...
-            ' is not implemented in sciserialize matlab yet']);
+        error('parsing to MATLAB data structure has failed');
     end
 end
 
-function [obj] = type_decoder(map)
-    if isKey(map, '__type__')
-        if strcmp(map('__type__'), 'datetime')
-            obj = datetime_decoder(map);
-        elseif strcmp(map('__type__'), 'timedelta')
-              obj = timedelta_decoder(map);
-        elseif strcmp(map('__type__'), 'ndarray')
-            obj = nd_array_decoder(map);
-        else
-            error(['Type ' map('__type__') ...
-                ' is not implemented in sciserialize matlab yet'])   
+% decoding type and calling the decoding functions
+function [obj] = type_decoder(data)
+    if iscell(data)
+        obj = {};
+        for idx = 1:length(data)
+            obj{idx} = type_decoder(data{idx});
         end
-    end   
+    elseif isstruct(data)
+        struct_keys = fieldnames(data);
+        obj = struct();
+        for idx = 1:length(struct_keys)
+            key = struct_keys{idx};
+            obj.(key) = type_decoder(data.(key));
+        end
+    elseif isa(data, 'containers.Map') && isKey(data, '__type__')
+        if strcmp(data('__type__'), 'datetime')
+            obj = datetime_decoder(data);
+        elseif strcmp(data('__type__'), 'timedelta')
+            obj = timedelta_decoder(data);
+        elseif strcmp(data('__type__'), 'ndarray')
+            obj = nd_array_decoder(data);
+        else
+            warning('unknown "__type__", throwing unprocessed containers.Map')
+            obj = data;
+        end
+    elseif isa(data, 'containers.Map')
+        map_keys = keys(data);
+        obj = containers.Map();
+        for idx = 1:length(map_keys)
+            key = map_keys{idx};
+            obj(key) = type_decoder(data(key));
+        end
+    else
+        obj = data;
+    end
 end
 
 % decodes datetimes to the matlab datetime class
 function obj = datetime_decoder(map)
-    t = map('isostr');
-    if isempty(regexp(t, '\d\d:\d\d:\d\d\.\d', 'match'))
-        t = regexprep(t, '(\d\d:\d\d:\d\d)', '$1\.0');
+    time_str = map('isostr');
+    % if there is no fractional digit, there will be one added for parsing
+    if isempty(regexp(time_str, '\d\d:\d\d:\d\d\.\d', 'match'))
+        time_str = regexprep(time_str, '(\d\d:\d\d:\d\d)', '$1\.0');
     end
-    out = regexp(t(end-5:end), '([-+]\d\d(:\d\d)?)|Z', 'match');
-    if isempty(out)
-        obj = datetime(t, ...
-        'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss.SSSS', ...
-        'Format', 'yyyy-MM-dd''T''HH:mm:ss.SSSS');
+    timezone = regexp(time_str(end-5:end), '([-+]\d\d(:\d\d)?)|Z', 'match');
+    if isempty(timezone)
+        obj = datetime(time_str, ...
+        'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss.SSSS');
     else
-        zone = out{1};
-        obj = datetime(t, ...
+        zone = timezone{1};
+        obj = datetime(time_str, ...
         'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss.SSSSXXX', ...
         'TimeZone', zone, ...
         'Format', 'yyyy-MM-dd''T''HH:mm:ss.SSSSXXX');
@@ -73,7 +80,7 @@ function obj = timedelta_decoder(map)
     % all of this types are of the class duration
     day = days(map('days'));
     second = seconds(map('seconds'));
-    millisec = duration(0,0,0,(map('microsec')/10^6));
+    millisec = duration(0, 0, 0, (map('microsec') / 10^6));
     obj = day + second + millisec;
 end
 
@@ -103,10 +110,10 @@ function obj = nd_array_decoder(map)
         data = typecast(binary, dtype);
     end
     data = reshape(data, fliplr(dim));
-
-
+    % do not think about it, it is doing it the right way to get the data
+    % in the correct form
     if length(dim) > 2
-        obj = permute(data,[2 1 3:length(dim)]); 
+        obj = permute(data,[2 1 3:length(dim)]);
     else
         obj = permute(data,[2 1]);
     end
