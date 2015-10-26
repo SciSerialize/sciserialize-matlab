@@ -49,7 +49,7 @@ function [idx] = next(json, idx)
 end
 
 % dispatches based on JSON type
-function [obj, idx] = value(json, idx, str_tokens, num_tokens, object_tag
+function [obj, idx] = value(json, idx, str_tokens, num_tokens, object_tag)
     char = json(idx);
     if char == '"'
         [obj, idx] = string(json, idx, str_tokens);
@@ -160,7 +160,7 @@ function [obj, idx] = object(json, idx, str_tokens, num_tokens, object_tag)
             end
             idx = next(json, idx);
             [val, idx] = value(json, idx, str_tokens, num_tokens, object_tag);
-            if strcmp(object_tag, '_struct_')
+            if strcmp(object_tag, '_map_')
                 obj(key) = val;
             else
                 obj.(genvarname(key)) = val; % make sure it's a valid name
