@@ -110,11 +110,7 @@ function obj = nd_array_decoder(map)
         data = typecast(binary, dtype);
     end
     data = reshape(data, fliplr(dim));
-    % do not think about it, it is doing it the right way to get the data
-    % in the correct form
-    if length(dim) > 2
-        obj = permute(data,[2 1 3:length(dim)]);
-    else
-        obj = permute(data,[2 1]);
-    end
+    % convert row-major (C, Python) to column-major (Matlab, FORTRAN)
+    value = reshape(value, fliplr(shape));
+    value = permute(value, length(shape):-1:1);
 end

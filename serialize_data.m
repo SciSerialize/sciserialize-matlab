@@ -14,7 +14,6 @@ function [ json ] = serialize_data( data )
     try
         data = value(data);
     catch err
-        err
         error('error by serializing the data to containers.Map');
     end
     json = dumpjson(data);
@@ -57,38 +56,25 @@ function [map] = encode_nd_array(data)
     if ~isreal(data) && isinteger(data)
         data = double(data); % Numpy does not know complex int
     end
-    % convert to uint8 1-D array in row-major order
+    % convert column-major (Matlab, FORTRAN) to row-major (C, Python)
+    value = permute(value, length(size(value)):-1:1);
+    % convert to uint8 1-D array
     dim = size(data);
     if isreal(data)
-        if length(dim) > 2
-            data = permute(data,[2 1 3:length(dim)]);
-        else
-            data = permute(data, [2 1]);
-        end
         binary = typecast(data(:), 'uint8');
     else
         % convert [complex, complex] into [real, imag, real, imag]
-        tmp = zeros(numel(data)*2, 1);
-        if isa(data, 'single')
+        tmp = zeros(numel(value)*2, 1);
+        if isa(value, 'single')
             tmp = single(tmp);
         end
-        if length(dim) > 2
-            data = permute(data,[2 1 3:length(dim)]);
-        else
-            data = permute(data, [2 1]);
-        end
-        tmp(1:2:end) = real(data(:));
-        tmp(2:2:end) = imag(data(:));
+        tmp(1:2:end) = real(value(:));
+        tmp(2:2:end) = imag(value(:));
         binary = typecast(tmp, 'uint8');
     end
-    if islogical(data)
+    if islogical(value)
         % convert logicals (bool) into one-byte-per-bit
-        if length(dim) > 2
-            data = permute(data,[2 1 3:length(dim)]);
-        else
-            data = permute(data, [2 1]);
-        end
-        binary = cast(data,'uint8');
+        binary = cast(value,'uint8');
     end
     base64_map = base64encode(binary);
     % translate Matlab class names into numpy dtypes
