@@ -21,9 +21,9 @@ end
 
 % checking value of data in a recursive way
 function obj = value(data)
-    if (isnumeric(value) && numel(value) ~= 0 && ...
-        (numel(value) > 1 || ~isreal(value)))
-        obj = encode_nd_array(data);
+    if (isnumeric(data) && numel(data) ~= 0 && ...
+         (numel(data) > 1 || ~isreal(data)))
+         obj = encode_nd_array(data);
     elseif isa(data , 'duration')
         obj = encode_duration(data);
     elseif isa(data , 'datetime')
@@ -58,24 +58,23 @@ function [map] = encode_nd_array(data)
         data = double(data); % Numpy does not know complex int
     end
     % convert column-major (Matlab, FORTRAN) to row-major (C, Python)
-    value = permute(value, length(size(value)):-1:1);
+    data = permute(data, length(size(data)):-1:1);
     % convert to uint8 1-D array
-    dim = size(data);
     if isreal(data)
         binary = typecast(data(:), 'uint8');
     else
         % convert [complex, complex] into [real, imag, real, imag]
-        tmp = zeros(numel(value)*2, 1);
-        if isa(value, 'single')
+        tmp = zeros(numel(data)*2, 1);
+        if isa(data, 'single')
             tmp = single(tmp);
         end
-        tmp(1:2:end) = real(value(:));
-        tmp(2:2:end) = imag(value(:));
+        tmp(1:2:end) = real(data(:));
+        tmp(2:2:end) = imag(data(:));
         binary = typecast(tmp, 'uint8');
     end
-    if islogical(value)
+    if islogical(data)
         % convert logicals (bool) into one-byte-per-bit
-        binary = cast(value,'uint8');
+        binary = cast(data,'uint8');
     end
     base64_map = base64encode(binary);
     % translate Matlab class names into numpy dtypes

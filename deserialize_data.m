@@ -80,8 +80,8 @@ function obj = timedelta_decoder(map)
     % all of this types are of the class duration
     day = days(map('days'));
     second = seconds(map('seconds'));
-    millisec = duration(0, 0, 0, (map('microsec') / 10^6));
-    obj = day + second + millisec;
+    millisec = duration(0, 0, 0, (map('microsec') / 10^3));
+    obj = millisec + day + second;
 end
 
 % decodes nd-arrays to n dimensional matlab matrixes
@@ -111,6 +111,5 @@ function obj = nd_array_decoder(map)
     end
     data = reshape(data, fliplr(dim));
     % convert row-major (C, Python) to column-major (Matlab, FORTRAN)
-    value = reshape(value, fliplr(shape));
-    value = permute(value, length(shape):-1:1);
+    obj = permute(data, length(dim):-1:1);
 end
