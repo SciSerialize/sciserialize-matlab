@@ -21,7 +21,8 @@ end
 
 % checking value of data in a recursive way
 function obj = value(data)
-    if isnumeric(data) && any(size(data) > 1)
+    if (isnumeric(value) && numel(value) ~= 0 && ...
+        (numel(value) > 1 || ~isreal(value)))
         obj = encode_nd_array(data);
     elseif isa(data , 'duration')
         obj = encode_duration(data);
