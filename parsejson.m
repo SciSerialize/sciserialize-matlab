@@ -8,8 +8,8 @@
 %    - null is converted to []
 %    - arrays are converted to cell arrays
 %    - objects are converted to containers.map or structs
-%       for structs use OBJECT_TAG "_struct_"
-%       for maps use "_map_". Map is default if no tag is given.
+%       for structs use OBJECT_TAG "struct"
+%       for maps use "map". Map is default if no tag is given.
 %
 %    In contrast to many other JSON parsers, this one does not try to
 %    convert all-numeric arrays into matrices. Thus, nested data
@@ -27,7 +27,7 @@
 
 function [obj] = parsejson(json, object_tag)
     if nargin < 2
-        object_tag = '_map_';
+        object_tag = 'map';
     end
     json = unescape_strings(json);
     str_tokens = tokenize_strings(json);
@@ -129,9 +129,9 @@ end
 % parses an object and advances idx
 function [obj, idx] = object(json, idx, str_tokens, num_tokens, object_tag)
     start = idx;
-    if strcmp(object_tag, '_map_')
+    if strcmp(object_tag, 'map')
         obj = containers.Map();
-    elseif strcmp(object_tag, '_struct_')
+    elseif strcmp(object_tag, 'struct')
          obj = struct();
     else
         error('JSON:parse:object:wrong_tag',...
@@ -160,7 +160,7 @@ function [obj, idx] = object(json, idx, str_tokens, num_tokens, object_tag)
             end
             idx = next(json, idx);
             [val, idx] = value(json, idx, str_tokens, num_tokens, object_tag);
-            if strcmp(object_tag, '_map_')
+            if strcmp(object_tag, 'map')
                 obj(key) = val;
             else
                 obj.(genvarname(key)) = val; % make sure it's a valid name
