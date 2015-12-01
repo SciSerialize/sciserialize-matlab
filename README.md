@@ -36,20 +36,10 @@ The encoded output is:
 
 Installation
 ----------------
-
-
-
-
 + Clone this repo
 + copy it to your working directory and use it like any other function.
 
 Tested with MATLAB 2015a
- <!-- Example -->
--------
-<!--```matlab
-
-```
--->
 
 Notes
 -----
