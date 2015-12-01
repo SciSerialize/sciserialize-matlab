@@ -103,7 +103,10 @@ end
 % creates map a datetime object
 function [map] = encode_datetime(data)
      date_string =  char(data,'yyyy-MM-dd''T''HH:mm:ss.SSSS');
-     time_zone = data.TimeZone;
+     time_zone = char(tzoffset(data));
+     if time_zone(1) ~= '-'
+         time_zone = ['+' time_zone];
+     end
      keys = { '__type__', 'isostr'};
      values = {'datetime', [date_string time_zone]};
      map = containers.Map(keys, values);
